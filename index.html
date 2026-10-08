@@ -1,0 +1,1125 @@
+
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-zinc-950 text-zinc-100 select-none">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Foto Carlos - Collage y Recortes</title>
+
+    <!-- PWA & Mobile Web App Settings -->
+    <meta name="theme-color" content="#121215">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Foto Carlos">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Fabric.js (Canvas Engine) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+    
+    <!-- Cropper.js (Image Cropping Engine) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+
+    <style>
+        /* Custom Scrollbars PS Touch Style */
+        ::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #121215;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #27272a;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #3f3f46;
+        }
+
+        /* Canvas Sheet Depth Effect */
+        .canvas-shadow {
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.85), 0 0 1px 1px rgba(255, 255, 255, 0.05);
+        }
+
+        /* Print Layout for Exact Sheet Rendering */
+        @media print {
+            body * {
+                visibility: hidden !important;
+            }
+            #print-container, #print-container * {
+                visibility: visible !important;
+            }
+            #print-container {
+                position: fixed !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 100% !important;
+                height: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                background: white !important;
+            }
+            #print-container img {
+                width: 100% !important;
+                height: 100% !important;
+                object-fit: contain !important;
+            }
+            @page {
+                size: auto;
+                margin: 0;
+            }
+        }
+
+        /* Grid Pattern */
+        .bg-grid-pattern {
+            background-image: linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+                              linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        /* Transparent Checkerboard for Layer Thumbs */
+        .bg-checkerboard {
+            background-color: #1e1e24;
+            background-image: linear-gradient(45deg, #27272a 25%, transparent 25%), 
+                              linear-gradient(-45deg, #27272a 25%, transparent 25%), 
+                              linear-gradient(45deg, transparent 75%, #27272a 75%), 
+                              linear-gradient(-45deg, transparent 75%, #27272a 75%);
+            background-size: 10px 10px;
+            background-position: 0 0, 0 5px, 5px -5px, -5px 0px;
+        }
+
+        .touch-action-none {
+            touch-action: none;
+        }
+
+        input[type=range] {
+            accent-color: #0ea5e9;
+        }
+    </style>
+</head>
+<body class="h-full flex flex-col font-sans overflow-hidden bg-zinc-950 text-zinc-100">
+
+    <!-- Top Header Bar -->
+    <header class="h-14 bg-zinc-900 border-b border-zinc-800/80 flex items-center justify-between px-3 md:px-5 z-40 shrink-0">
+        <!-- Logo & Branding -->
+        <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-lg bg-gradient-to-tr from-sky-600 to-cyan-500 flex items-center justify-center text-white shadow-lg shadow-sky-950/50">
+                <i class="fa-solid fa-layer-group text-lg"></i>
+            </div>
+            <div class="flex flex-col">
+                <h1 class="font-bold text-sm md:text-base tracking-wide text-zinc-100 leading-none">
+                    Foto Carlos
+                </h1>
+                <span class="text-[10px] text-sky-400 font-medium tracking-wider uppercase mt-0.5">
+                    Collage y Recortes
+                </span>
+            </div>
+        </div>
+
+        <!-- Canvas Format Dropdown & Global Controls -->
+        <div class="flex items-center gap-2">
+            <!-- Canvas Format Preset Selector -->
+            <div class="relative bg-zinc-800/90 border border-zinc-700/70 rounded-lg px-2.5 py-1.5 flex items-center gap-2">
+                <i class="fa-solid fa-ruler-combined text-sky-400 text-xs"></i>
+                <select id="format-selector" class="bg-transparent text-xs font-semibold text-zinc-200 focus:outline-none cursor-pointer pr-1">
+                    <option value="a4-portrait" class="bg-zinc-900">A4 Vertical (210×297 mm)</option>
+                    <option value="a4-landscape" class="bg-zinc-900">A4 Horizontal (297×210 mm)</option>
+                    <option value="photo-10x15-v" class="bg-zinc-900">Foto 10x15 cm (Vertical)</option>
+                    <option value="photo-10x15-h" class="bg-zinc-900">Foto 15x10 cm (Horizontal)</option>
+                    <option value="photo-13x18-v" class="bg-zinc-900">Foto 13x18 cm (Vertical)</option>
+                    <option value="photo-13x18-h" class="bg-zinc-900">Foto 18x13 cm (Horizontal)</option>
+                    <option value="square" class="bg-zinc-900">Cuadrado (1:1)</option>
+                    <option value="insta-post" class="bg-zinc-900">Instagram Post (4:5)</option>
+                    <option value="insta-story" class="bg-zinc-900">Story / Reel (9:16)</option>
+                </select>
+            </div>
+
+            <!-- Install PWA Button -->
+            <button id="btn-install" class="hidden bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-1.5 rounded-lg font-semibold transition flex items-center gap-1.5 shadow-md shadow-emerald-950/50">
+                <i class="fa-solid fa-download"></i>
+                <span class="hidden sm:inline">Instalar App</span>
+            </button>
+
+            <!-- Export / Print Modal Button -->
+            <button id="btn-open-export" class="bg-sky-600 hover:bg-sky-500 active:scale-95 text-white text-xs px-3.5 py-1.5 rounded-lg font-semibold transition flex items-center gap-1.5 shadow-md shadow-sky-950/50">
+                <i class="fa-solid fa-share-nodes"></i>
+                <span class="hidden sm:inline">Exportar</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Workspace Container -->
+    <div class="flex-1 flex overflow-hidden relative">
+        
+        <!-- Left Tools Drawer (Desktop & Tablet) -->
+        <aside class="hidden md:flex flex-col w-16 bg-zinc-900/90 border-r border-zinc-800/80 items-center py-4 gap-4 z-20 shrink-0">
+            <!-- Add Image -->
+            <label for="image-upload-desktop" title="Añadir Imagen" class="w-10 h-10 rounded-xl bg-sky-600 hover:bg-sky-500 text-white flex items-center justify-center cursor-pointer transition shadow-md shadow-sky-950/50">
+                <i class="fa-solid fa-plus text-base"></i>
+            </label>
+            <input type="file" id="image-upload-desktop" accept="image/*" multiple class="hidden">
+
+            <div class="w-8 h-[1px] bg-zinc-800"></div>
+
+            <!-- Layers Panel Toggle Button -->
+            <button id="btn-toggle-layers-desktop" title="Ver Capas (Photoshop)" class="relative w-10 h-10 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white flex items-center justify-center transition">
+                <i class="fa-solid fa-layer-group text-base"></i>
+                <span id="layer-badge-desktop" class="absolute -top-1 -right-1 bg-sky-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center">0</span>
+            </button>
+
+            <!-- Crop Button -->
+            <button id="btn-crop-desktop" title="Recortar Foto" class="w-10 h-10 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white flex items-center justify-center transition">
+                <i class="fa-solid fa-crop-simple text-base"></i>
+            </button>
+
+            <!-- Adjustments Toggle Button -->
+            <button id="btn-adjust-desktop" title="Ajustes de Imagen" class="w-10 h-10 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white flex items-center justify-center transition">
+                <i class="fa-solid fa-sliders text-base"></i>
+            </button>
+
+            <div class="w-8 h-[1px] bg-zinc-800"></div>
+
+            <!-- Clear Canvas Button -->
+            <button id="btn-clear-canvas" title="Vaciar Lienzo" class="w-10 h-10 rounded-xl bg-red-950/40 hover:bg-red-600 text-red-400 hover:text-white flex items-center justify-center transition">
+                <i class="fa-solid fa-trash-can text-base"></i>
+            </button>
+        </aside>
+
+        <!-- Canvas Central Viewport -->
+        <main class="flex-1 relative overflow-hidden bg-zinc-950 flex flex-col items-center justify-center p-2 sm:p-6 bg-grid-pattern">
+            
+            <!-- Quick Selection Floating Context Action Bar -->
+            <div id="selection-action-bar" class="absolute top-4 z-30 bg-zinc-900/95 border border-zinc-800 rounded-full shadow-2xl px-3 py-1.5 flex items-center gap-2 transition-all duration-200 opacity-0 pointer-events-none -translate-y-2">
+                <button id="btn-quick-crop" class="text-xs px-3 py-1 rounded-full bg-zinc-800 hover:bg-sky-600 text-zinc-200 hover:text-white transition flex items-center gap-1.5 font-medium">
+                    <i class="fa-solid fa-crop-simple text-sky-400"></i> Recortar
+                </button>
+                <div class="w-[1px] h-4 bg-zinc-800"></div>
+                <button id="btn-rotate-left" title="Girar 90° Izquierda" class="w-7 h-7 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 flex items-center justify-center text-xs">
+                    <i class="fa-solid fa-rotate-left"></i>
+                </button>
+                <button id="btn-rotate-right" title="Girar 90° Derecha" class="w-7 h-7 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 flex items-center justify-center text-xs">
+                    <i class="fa-solid fa-rotate-right"></i>
+                </button>
+                <button id="btn-flip-x" title="Espejar Horizontal" class="w-7 h-7 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 flex items-center justify-center text-xs">
+                    <i class="fa-solid fa-arrows-left-right-to-line"></i>
+                </button>
+                <div class="w-[1px] h-4 bg-zinc-800"></div>
+                <button id="btn-quick-delete" title="Eliminar Imagen" class="w-7 h-7 rounded-full bg-red-500/20 hover:bg-red-600 text-red-400 hover:text-white flex items-center justify-center text-xs transition">
+                    <i class="fa-solid fa-trash"></i>
+                </button>
+            </div>
+
+            <!-- Paper Sheet Canvas Wrapper -->
+            <div id="canvas-paper-wrapper" class="relative flex items-center justify-center max-w-full max-h-full transition-all duration-300">
+                <div id="canvas-sheet" class="relative bg-white canvas-shadow rounded-sm overflow-hidden">
+                    <canvas id="main-canvas" class="touch-action-none"></canvas>
+                </div>
+            </div>
+
+            <!-- Format Information Badge -->
+            <div id="format-badge" class="absolute bottom-4 left-4 bg-zinc-900/90 border border-zinc-800 px-3 py-1 rounded-lg text-[11px] font-mono text-zinc-400 z-10 shadow-lg">
+                A4 Vertical (210×297 mm)
+            </div>
+
+            <!-- Canvas Zoom Floating Controls -->
+            <div class="absolute bottom-4 right-4 z-10 flex items-center gap-1 bg-zinc-900/90 border border-zinc-800 p-1 rounded-xl shadow-lg">
+                <button id="btn-zoom-out" class="w-7 h-7 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 flex items-center justify-center text-xs">
+                    <i class="fa-solid fa-minus"></i>
+                </button>
+                <span id="lbl-zoom-val" class="text-[10px] font-mono text-zinc-400 px-1.5">100%</span>
+                <button id="btn-zoom-in" class="w-7 h-7 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 flex items-center justify-center text-xs">
+                    <i class="fa-solid fa-plus"></i>
+                </button>
+            </div>
+        </main>
+
+        <!-- Photoshop Touch Style Layers Panel (Side / Overlay Drawer) -->
+        <aside id="ps-layers-drawer" class="fixed md:absolute right-0 top-14 md:top-0 bottom-16 md:bottom-0 w-72 bg-zinc-900/95 border-l border-zinc-800/90 flex flex-col z-30 transition-transform duration-300 translate-x-full md:translate-x-0 shadow-2xl">
+            <!-- Layers Panel Header -->
+            <div class="h-12 px-4 border-b border-zinc-800/80 flex items-center justify-between shrink-0">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-layer-group text-sky-400 text-sm"></i>
+                    <h3 class="font-bold text-xs uppercase tracking-wider text-zinc-200">Panel de Capas</h3>
+                </div>
+                <button id="btn-close-layers-drawer" class="md:hidden text-zinc-400 hover:text-white p-1">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Active Selected Layer Quick Controls -->
+            <div id="layer-active-controls" class="p-3 border-b border-zinc-800/80 bg-zinc-950/50 flex flex-col gap-2 shrink-0 opacity-50 pointer-events-none">
+                <!-- Opacity Slider -->
+                <div class="flex flex-col gap-1">
+                    <div class="flex justify-between text-[11px]">
+                        <span class="text-zinc-400">Opacidad / Transparencia</span>
+                        <span id="lbl-layer-opacity" class="text-sky-400 font-mono">100%</span>
+                    </div>
+                    <input type="range" id="slider-layer-opacity" min="0" max="1" step="0.01" value="1" class="w-full h-1 bg-zinc-800 rounded-lg">
+                </div>
+
+                <!-- Layer Reorder & Actions Buttons -->
+                <div class="grid grid-cols-4 gap-1 mt-1">
+                    <button id="btn-layer-top" title="Traer al frente" class="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 p-2 rounded-lg text-xs flex items-center justify-center">
+                        <i class="fa-solid fa-angles-up"></i>
+                    </button>
+                    <button id="btn-layer-up" title="Subir capa" class="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 p-2 rounded-lg text-xs flex items-center justify-center">
+                        <i class="fa-solid fa-chevron-up"></i>
+                    </button>
+                    <button id="btn-layer-down" title="Bajar capa" class="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 p-2 rounded-lg text-xs flex items-center justify-center">
+                        <i class="fa-solid fa-chevron-down"></i>
+                    </button>
+                    <button id="btn-layer-bottom" title="Enviar al fondo" class="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 p-2 rounded-lg text-xs flex items-center justify-center">
+                        <i class="fa-solid fa-angles-down"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Layers Stack List -->
+            <div id="layers-stack-list" class="flex-1 overflow-y-auto p-2 flex flex-col gap-1.5">
+                <!-- Layer items injected dynamically -->
+                <div class="text-center py-8 text-zinc-500 text-xs italic">
+                    Sin fotos añadidas.<br>Pulsa "+" para agregar capas.
+                </div>
+            </div>
+
+            <!-- Layers Drawer Footer -->
+            <div class="p-3 border-t border-zinc-800/80 bg-zinc-950/60 flex items-center justify-between shrink-0">
+                <button id="btn-duplicate-layer" class="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5">
+                    <i class="fa-solid fa-copy text-emerald-400"></i> Duplicar
+                </button>
+                <button id="btn-delete-layer" class="bg-red-950/50 hover:bg-red-900/80 text-red-300 px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5">
+                    <i class="fa-solid fa-trash-can"></i> Borrar
+                </button>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Mobile Bottom Navigation Bar -->
+    <footer class="md:hidden bg-zinc-900 border-t border-zinc-800 shrink-0 z-40">
+        <div class="grid grid-cols-5 h-16">
+            <!-- Add Button -->
+            <label for="image-upload-mobile" class="flex flex-col items-center justify-center text-sky-400 active:scale-95 transition cursor-pointer">
+                <i class="fa-solid fa-circle-plus text-xl"></i>
+                <span class="text-[10px] font-medium mt-1">Añadir</span>
+            </label>
+            <input type="file" id="image-upload-mobile" accept="image/*" multiple class="hidden">
+
+            <!-- Layers Button -->
+            <button id="btn-tab-layers" class="flex flex-col items-center justify-center text-zinc-400 hover:text-zinc-200 transition relative">
+                <i class="fa-solid fa-layer-group text-lg"></i>
+                <span class="text-[10px] font-medium mt-1">Capas</span>
+                <span id="layer-badge-mobile" class="absolute top-1 right-5 bg-sky-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center">0</span>
+            </button>
+
+            <!-- Crop Button -->
+            <button id="btn-tab-crop" class="flex flex-col items-center justify-center text-zinc-400 hover:text-zinc-200 transition">
+                <i class="fa-solid fa-crop-simple text-lg"></i>
+                <span class="text-[10px] font-medium mt-1">Recortar</span>
+            </button>
+
+            <!-- Adjustments Button -->
+            <button id="btn-tab-adjust" class="flex flex-col items-center justify-center text-zinc-400 hover:text-zinc-200 transition">
+                <i class="fa-solid fa-sliders text-lg"></i>
+                <span class="text-[10px] font-medium mt-1">Ajustes</span>
+            </button>
+
+            <!-- Canvas BG Button -->
+            <button id="btn-tab-canvas" class="flex flex-col items-center justify-center text-zinc-400 hover:text-zinc-200 transition">
+                <i class="fa-solid fa-gear text-lg"></i>
+                <span class="text-[10px] font-medium mt-1">Lienzo</span>
+            </button>
+        </div>
+    </footer>
+
+    <!-- Image Adjustments Sheet Modal -->
+    <div id="adjustments-modal" class="fixed inset-0 z-50 bg-black/80 hidden flex items-end sm:items-center justify-center backdrop-blur-sm p-0 sm:p-4">
+        <div class="bg-zinc-900 border border-zinc-800 rounded-t-2xl sm:rounded-2xl w-full max-w-md p-5 flex flex-col gap-4 shadow-2xl">
+            <div class="flex items-center justify-between border-b border-zinc-800 pb-3">
+                <h3 class="font-bold text-sm text-zinc-100 flex items-center gap-2">
+                    <i class="fa-solid fa-sliders text-sky-400"></i>
+                    Ajustes de Foto & Filtros
+                </h3>
+                <button id="btn-close-adjustments" class="text-zinc-400 hover:text-white">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <div id="adjustments-controls-wrapper" class="flex flex-col gap-3">
+                <!-- Brightness -->
+                <div class="flex flex-col gap-1">
+                    <div class="flex justify-between text-xs text-zinc-400">
+                        <span>Brillo</span>
+                        <span id="lbl-brightness-val" class="font-mono text-sky-400">0</span>
+                    </div>
+                    <input type="range" id="slider-brightness" min="-1" max="1" step="0.05" value="0" class="w-full h-1 bg-zinc-800 rounded-lg">
+                </div>
+
+                <!-- Contrast -->
+                <div class="flex flex-col gap-1">
+                    <div class="flex justify-between text-xs text-zinc-400">
+                        <span>Contraste</span>
+                        <span id="lbl-contrast-val" class="font-mono text-sky-400">0</span>
+                    </div>
+                    <input type="range" id="slider-contrast" min="-1" max="1" step="0.05" value="0" class="w-full h-1 bg-zinc-800 rounded-lg">
+                </div>
+
+                <!-- Saturation -->
+                <div class="flex flex-col gap-1">
+                    <div class="flex justify-between text-xs text-zinc-400">
+                        <span>Saturación</span>
+                        <span id="lbl-saturation-val" class="font-mono text-sky-400">0</span>
+                    </div>
+                    <input type="range" id="slider-saturation" min="-1" max="1" step="0.05" value="0" class="w-full h-1 bg-zinc-800 rounded-lg">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Photo Crop Modal Dialog -->
+    <div id="crop-modal" class="fixed inset-0 z-50 bg-black/95 flex flex-col hidden backdrop-blur-md">
+        <!-- Crop Header -->
+        <div class="h-14 px-4 border-b border-zinc-800 flex items-center justify-between shrink-0">
+            <div class="flex items-center gap-2">
+                <i class="fa-solid fa-crop-simple text-sky-400 text-lg"></i>
+                <h3 class="font-bold text-sm text-white">Recortar Fotografía</h3>
+            </div>
+            <button id="btn-cancel-crop" class="text-zinc-400 hover:text-white p-2">
+                <i class="fa-solid fa-xmark text-xl"></i>
+            </button>
+        </div>
+
+        <!-- Crop Canvas Viewport -->
+        <div class="flex-1 relative overflow-hidden p-4 flex items-center justify-center bg-zinc-950">
+            <img id="crop-target-img" class="max-h-full max-w-full object-contain">
+        </div>
+
+        <!-- Crop Presets Bar (Including standard 10x15, 13x18, 15x18 V/H) -->
+        <div class="p-3 bg-zinc-900 border-t border-zinc-800 flex flex-col gap-3 shrink-0">
+            <div class="text-[11px] font-semibold text-zinc-400 px-1 uppercase tracking-wider">
+                Formatos Fotográficos Estándar:
+            </div>
+            
+            <div class="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                <!-- Free -->
+                <button data-aspect="free" class="btn-crop-ratio bg-sky-600 text-white text-xs px-3 py-1.5 rounded-lg font-medium shrink-0">
+                    Libre
+                </button>
+                <!-- 1:1 -->
+                <button data-aspect="1" class="btn-crop-ratio bg-zinc-800 text-zinc-300 text-xs px-3 py-1.5 rounded-lg shrink-0">
+                    1:1
+                </button>
+                <!-- 10x15 Vertical (2:3) -->
+                <button data-aspect="0.6666" class="btn-crop-ratio bg-zinc-800 text-zinc-300 text-xs px-3 py-1.5 rounded-lg shrink-0">
+                    10x15 cm (V)
+                </button>
+                <!-- 15x10 Horizontal (3:2) -->
+                <button data-aspect="1.5" class="btn-crop-ratio bg-zinc-800 text-zinc-300 text-xs px-3 py-1.5 rounded-lg shrink-0">
+                    15x10 cm (H)
+                </button>
+                <!-- 13x18 Vertical (13:18) -->
+                <button data-aspect="0.7222" class="btn-crop-ratio bg-zinc-800 text-zinc-300 text-xs px-3 py-1.5 rounded-lg shrink-0">
+                    13x18 cm (V)
+                </button>
+                <!-- 18x13 Horizontal (18:13) -->
+                <button data-aspect="1.3846" class="btn-crop-ratio bg-zinc-800 text-zinc-300 text-xs px-3 py-1.5 rounded-lg shrink-0">
+                    18x13 cm (H)
+                </button>
+                <!-- 15x18 Vertical (15:18) -->
+                <button data-aspect="0.8333" class="btn-crop-ratio bg-zinc-800 text-zinc-300 text-xs px-3 py-1.5 rounded-lg shrink-0">
+                    15x18 cm (V)
+                </button>
+                <!-- 18x15 Horizontal (18:15) -->
+                <button data-aspect="1.2" class="btn-crop-ratio bg-zinc-800 text-zinc-300 text-xs px-3 py-1.5 rounded-lg shrink-0">
+                    18x15 cm (H)
+                </button>
+                <!-- 4:3 -->
+                <button data-aspect="1.3333" class="btn-crop-ratio bg-zinc-800 text-zinc-300 text-xs px-3 py-1.5 rounded-lg shrink-0">
+                    4:3
+                </button>
+                <!-- 16:9 -->
+                <button data-aspect="1.7777" class="btn-crop-ratio bg-zinc-800 text-zinc-300 text-xs px-3 py-1.5 rounded-lg shrink-0">
+                    16:9
+                </button>
+            </div>
+
+            <!-- Apply Action Button -->
+            <div class="flex justify-end pt-1">
+                <button id="btn-apply-crop" class="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-6 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/50">
+                    <i class="fa-solid fa-check text-sm"></i>
+                    <span>Aplicar Recorte</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Export Options Modal -->
+    <div id="export-modal" class="fixed inset-0 z-50 bg-black/80 hidden flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 max-w-sm w-full shadow-2xl flex flex-col gap-4">
+            <div class="flex items-center justify-between border-b border-zinc-800 pb-3">
+                <h3 class="font-bold text-sm text-white flex items-center gap-2">
+                    <i class="fa-solid fa-file-export text-sky-400"></i>
+                    Exportar / Imprimir
+                </h3>
+                <button id="btn-close-export" class="text-zinc-400 hover:text-white">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <p class="text-xs text-zinc-400">Elige el formato de salida para guardar en la galería o imprimir:</p>
+
+            <div class="flex flex-col gap-2.5">
+                <button id="btn-export-png" class="bg-zinc-800 hover:bg-zinc-700 border border-zinc-700/80 text-white p-3 rounded-xl flex items-center justify-between transition group">
+                    <div class="flex items-center gap-3">
+                        <i class="fa-solid fa-file-image text-sky-400 text-xl"></i>
+                        <div class="text-left">
+                            <div class="font-bold text-xs">Descargar Imagen PNG</div>
+                            <div class="text-[10px] text-zinc-400">Máxima calidad y nitidez</div>
+                        </div>
+                    </div>
+                    <i class="fa-solid fa-download text-zinc-400 group-hover:text-white text-sm"></i>
+                </button>
+
+                <button id="btn-export-jpg" class="bg-zinc-800 hover:bg-zinc-700 border border-zinc-700/80 text-white p-3 rounded-xl flex items-center justify-between transition group">
+                    <div class="flex items-center gap-3">
+                        <i class="fa-solid fa-file-jpg text-emerald-400 text-xl"></i>
+                        <div class="text-left">
+                            <div class="font-bold text-xs">Descargar Imagen JPG</div>
+                            <div class="text-[10px] text-zinc-400">Formato fotográfico ligero</div>
+                        </div>
+                    </div>
+                    <i class="fa-solid fa-download text-zinc-400 group-hover:text-white text-sm"></i>
+                </button>
+
+                <button id="btn-print-direct" class="bg-sky-600 hover:bg-sky-500 text-white p-3 rounded-xl flex items-center justify-between transition shadow-lg shadow-sky-950/50">
+                    <div class="flex items-center gap-3">
+                        <i class="fa-solid fa-print text-xl"></i>
+                        <div class="text-left">
+                            <div class="font-bold text-xs">Imprimir Directamente</div>
+                            <div class="text-[10px] opacity-80">Ajustado al formato A4</div>
+                        </div>
+                    </div>
+                    <i class="fa-solid fa-chevron-right text-sm"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden Print Container -->
+    <div id="print-container" class="hidden">
+        <img id="print-image" src="" alt="Foto Carlos Preview">
+    </div>
+
+    <!-- Toast Notification Overlay -->
+    <div id="toast" class="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-zinc-800/95 border border-zinc-700 text-zinc-200 text-xs px-4 py-2 rounded-full shadow-2xl transition-all duration-300 opacity-0 pointer-events-none flex items-center gap-2">
+        <i id="toast-icon" class="fa-solid fa-circle-info text-sky-400"></i>
+        <span id="toast-msg">Notificación</span>
+    </div>
+
+    <script>
+        const appIconSVG = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' fill='%230ea5e9'><rect width='512' height='512' rx='120' fill='%23121215'/><path d='M160 128h192v64H160zm0 128h192v128H160z' fill='%23ffffff'/><circle cx='256' cy='320' r='40' fill='%230ea5e9'/></svg>`;
+        
+        const manifestData = {
+            name: "Foto Carlos - Collage y Recortes",
+            short_name: "Foto Carlos",
+            description: "Editor de fotos estilo Photoshop Touch con collage e imprenta en A4 y fotos estándar",
+            start_url: ".",
+            display: "standalone",
+            background_color: "#121215",
+            theme_color: "#121215",
+            icons: [{
+                src: `data:image/svg+xml;utf8,${appIconSVG}`,
+                sizes: "512x512",
+                type: "image/svg+xml"
+            }]
+        };
+
+        const manifestBlob = new Blob([JSON.stringify(manifestData)], { type: 'application/json' });
+        const manifestLink = document.createElement('link');
+        manifestLink.rel = 'manifest';
+        manifestLink.href = URL.createObjectURL(manifestBlob);
+        document.head.appendChild(manifestLink);
+
+        if ('serviceWorker' in navigator) {
+            const swCode = `
+                self.addEventListener('install', (e) => self.skipWaiting());
+                self.addEventListener('activate', (e) => self.clients.claim());
+                self.addEventListener('fetch', (e) => {
+                    e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
+                });
+            `;
+            const swBlob = new Blob([swCode], { type: 'application/javascript' });
+            navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(() => {});
+        }
+
+        let deferredPrompt = null;
+        const btnInstall = document.getElementById('btn-install');
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            btnInstall.classList.remove('hidden');
+        });
+
+        btnInstall.addEventListener('click', async () => {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                if (outcome === 'accepted') btnInstall.classList.add('hidden');
+                deferredPrompt = null;
+            }
+        });
+
+        let fabricCanvas = null;
+        let activeCropper = null;
+
+        // Aspect Ratio Mapping (Height / Width)
+        const CANVAS_FORMATS = {
+            'a4-portrait': { ratio: 297 / 210, label: 'A4 Vertical (210×297 mm)', printDpiWidth: 2480 },
+            'a4-landscape': { ratio: 210 / 297, label: 'A4 Horizontal (297×210 mm)', printDpiWidth: 3508 },
+            'photo-10x15-v': { ratio: 15 / 10, label: 'Foto 10x15 cm (Vertical)', printDpiWidth: 1800 },
+            'photo-10x15-h': { ratio: 10 / 15, label: 'Foto 15x10 cm (Horizontal)', printDpiWidth: 2700 },
+            'photo-13x18-v': { ratio: 18 / 13, label: 'Foto 13x18 cm (Vertical)', printDpiWidth: 2160 },
+            'photo-13x18-h': { ratio: 13 / 18, label: 'Foto 18x13 cm (Horizontal)', printDpiWidth: 2988 },
+            'square': { ratio: 1, label: 'Cuadrado (1:1)', printDpiWidth: 2048 },
+            'insta-post': { ratio: 5 / 4, label: 'Instagram Post (4:5)', printDpiWidth: 2048 },
+            'insta-story': { ratio: 16 / 9, label: 'Story / Reel (9:16)', printDpiWidth: 1080 }
+        };
+
+        let currentFormatKey = 'a4-portrait';
+
+        function showToast(msg, icon = 'fa-circle-info') {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toast-msg');
+            const toastIcon = document.getElementById('toast-icon');
+            
+            toastMsg.textContent = msg;
+            toastIcon.className = `fa-solid ${icon} text-sky-400`;
+            
+            toast.classList.remove('opacity-0', 'pointer-events-none');
+            toast.classList.add('opacity-100');
+            
+            setTimeout(() => {
+                toast.classList.remove('opacity-100');
+                toast.classList.add('opacity-0', 'pointer-events-none');
+            }, 2200);
+        }
+
+        function initCanvas() {
+            const sheet = document.getElementById('canvas-sheet');
+            const badge = document.getElementById('format-badge');
+            
+            const format = CANVAS_FORMATS[currentFormatKey];
+            badge.textContent = format.label;
+
+            const padding = 32;
+            const maxWidth = Math.min(window.innerWidth - padding - (window.innerWidth >= 768 ? 320 : 0), 540);
+            const maxHeight = window.innerHeight - (window.innerWidth < 768 ? 190 : 130);
+            
+            let canvasWidth = maxWidth;
+            let canvasHeight = canvasWidth * format.ratio;
+
+            if (canvasHeight > maxHeight) {
+                canvasHeight = maxHeight;
+                canvasWidth = canvasHeight / format.ratio;
+            }
+
+            sheet.style.width = `${canvasWidth}px`;
+            sheet.style.height = `${canvasHeight}px`;
+
+            if (!fabricCanvas) {
+                fabricCanvas = new fabric.Canvas('main-canvas', {
+                    width: canvasWidth,
+                    height: canvasHeight,
+                    backgroundColor: '#ffffff',
+                    preserveObjectStacking: true,
+                    selection: true
+                });
+
+                fabricCanvas.on('selection:created', onSelectionUpdated);
+                fabricCanvas.on('selection:updated', onSelectionUpdated);
+                fabricCanvas.on('selection:cleared', onSelectionCleared);
+                fabricCanvas.on('object:added', renderPSLayersList);
+                fabricCanvas.on('object:removed', renderPSLayersList);
+                fabricCanvas.on('object:modified', renderPSLayersList);
+            } else {
+                fabricCanvas.setDimensions({
+                    width: canvasWidth,
+                    height: canvasHeight
+                });
+            }
+        }
+
+        const selectionBar = document.getElementById('selection-action-bar');
+        const layerActiveControls = document.getElementById('layer-active-controls');
+
+        function onSelectionUpdated() {
+            const activeObj = fabricCanvas.getActiveObject();
+            if (activeObj) {
+                selectionBar.classList.remove('opacity-0', 'pointer-events-none', '-translate-y-2');
+                selectionBar.classList.add('opacity-100', 'translate-y-0');
+
+                layerActiveControls.classList.remove('opacity-50', 'pointer-events-none');
+
+                syncLayerControls(activeObj);
+            } else {
+                onSelectionCleared();
+            }
+            renderPSLayersList();
+        }
+
+        function onSelectionCleared() {
+            selectionBar.classList.add('opacity-0', 'pointer-events-none', '-translate-y-2');
+            selectionBar.classList.remove('opacity-100', 'translate-y-0');
+
+            layerActiveControls.classList.add('opacity-50', 'pointer-events-none');
+            renderPSLayersList();
+        }
+
+        function syncLayerControls(obj) {
+            const op = obj.opacity !== undefined ? obj.opacity : 1;
+            document.getElementById('slider-layer-opacity').value = op;
+            document.getElementById('lbl-layer-opacity').textContent = `${Math.round(op * 100)}%`;
+
+            let brightness = 0, contrast = 0, saturation = 0;
+            if (obj.filters) {
+                obj.filters.forEach(f => {
+                    if (f instanceof fabric.Image.filters.Brightness) brightness = f.brightness;
+                    if (f instanceof fabric.Image.filters.Contrast) contrast = f.contrast;
+                    if (f instanceof fabric.Image.filters.Saturation) saturation = f.saturation;
+                });
+            }
+
+            document.getElementById('slider-brightness').value = brightness;
+            document.getElementById('lbl-brightness-val').textContent = brightness;
+
+            document.getElementById('slider-contrast').value = contrast;
+            document.getElementById('lbl-contrast-val').textContent = contrast;
+
+            document.getElementById('slider-saturation').value = saturation;
+            document.getElementById('lbl-saturation-val').textContent = saturation;
+        }
+
+        function renderPSLayersList() {
+            const stackList = document.getElementById('layers-stack-list');
+            const objects = fabricCanvas.getObjects();
+
+            const badgeDesk = document.getElementById('layer-badge-desktop');
+            const badgeMob = document.getElementById('layer-badge-mobile');
+            badgeDesk.textContent = objects.length;
+            badgeMob.textContent = objects.length;
+
+            if (objects.length === 0) {
+                stackList.innerHTML = `
+                    <div class="text-center py-8 text-zinc-500 text-xs italic">
+                        Sin fotos añadidas.<br>Pulsa "+" para agregar capas.
+                    </div>`;
+                return;
+            }
+
+            stackList.innerHTML = '';
+            const activeObj = fabricCanvas.getActiveObject();
+
+            // Render top layer first (reverse order)
+            objects.slice().reverse().forEach((obj, idx) => {
+                const realIndex = objects.length - 1 - idx;
+                const isSelected = activeObj === obj;
+
+                const item = document.createElement('div');
+                item.className = `p-2 rounded-xl border flex items-center justify-between gap-2 cursor-pointer transition ${
+                    isSelected 
+                    ? 'border-sky-500 bg-sky-950/40 text-white' 
+                    : 'border-zinc-800/80 bg-zinc-950/80 text-zinc-400 hover:border-zinc-700 hover:bg-zinc-800/50'
+                }`;
+
+                // Generate thumbnail image
+                let thumbUrl = '';
+                if (obj.type === 'image' && obj.getElement()) {
+                    thumbUrl = obj.getElement().src;
+                }
+
+                item.innerHTML = `
+                    <div class="flex items-center gap-2.5 overflow-hidden">
+                        <!-- Thumbnail Box -->
+                        <div class="w-10 h-10 rounded-lg bg-checkerboard border border-zinc-700/60 flex items-center justify-center overflow-hidden shrink-0">
+                            ${thumbUrl ? `<img src="${thumbUrl}" class="w-full h-full object-cover">` : `<i class="fa-solid fa-image text-zinc-500"></i>`}
+                        </div>
+                        
+                        <!-- Layer Details -->
+                        <div class="flex flex-col truncate">
+                            <span class="text-xs font-bold truncate">Capa ${realIndex + 1}</span>
+                            <span class="text-[10px] text-zinc-500 truncate font-mono">${Math.round(obj.opacity * 100)}% opacidad</span>
+                        </div>
+                    </div>
+
+                    <!-- Quick Layer Icons (Visibility & Lock) -->
+                    <div class="flex items-center gap-1 shrink-0">
+                        <button class="btn-toggle-vis p-1.5 text-zinc-400 hover:text-white" title="Ocultar/Mostrar">
+                            <i class="fa-solid ${obj.visible ? 'fa-eye text-sky-400' : 'fa-eye-slash text-zinc-600'} text-xs"></i>
+                        </button>
+                        <button class="btn-toggle-lock p-1.5 text-zinc-400 hover:text-white" title="Bloquear/Desbloquear">
+                            <i class="fa-solid ${obj.lockMovementX ? 'fa-lock text-amber-400' : 'fa-lock-open text-zinc-600'} text-xs"></i>
+                        </button>
+                    </div>
+                `;
+
+                // Item Click selects object on canvas directly
+                item.addEventListener('click', (e) => {
+                    if (e.target.closest('.btn-toggle-vis') || e.target.closest('.btn-toggle-lock')) return;
+                    fabricCanvas.setActiveObject(obj);
+                    fabricCanvas.renderAll();
+                    renderPSLayersList();
+                });
+
+                // Visibility Toggle Button
+                item.querySelector('.btn-toggle-vis').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    obj.set('visible', !obj.visible);
+                    fabricCanvas.renderAll();
+                    renderPSLayersList();
+                });
+
+                // Lock Toggle Button
+                item.querySelector('.btn-toggle-lock').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const isLocked = !obj.lockMovementX;
+                    obj.set({
+                        lockMovementX: isLocked,
+                        lockMovementY: isLocked,
+                        lockRotation: isLocked,
+                        lockScalingX: isLocked,
+                        lockScalingY: isLocked
+                    });
+                    fabricCanvas.renderAll();
+                    renderPSLayersList();
+                });
+
+                stackList.appendChild(item);
+            });
+        }
+
+        function handleImageUpload(e) {
+            const files = e.target.files;
+            if (!files || files.length === 0) return;
+
+            Array.from(files).forEach((file, idx) => {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    fabric.Image.fromURL(event.target.result, (img) => {
+                        const targetWidth = fabricCanvas.width * 0.55;
+                        const scale = targetWidth / img.width;
+                        
+                        img.set({
+                            left: (fabricCanvas.width - img.width * scale) / 2 + (idx * 15),
+                            top: (fabricCanvas.height - img.height * scale) / 2 + (idx * 15),
+                            scaleX: scale,
+                            scaleY: scale,
+                            cornerStyle: 'circle',
+                            cornerColor: '#0ea5e9',
+                            borderColor: '#38bdf8',
+                            cornerSize: 12,
+                            transparentCorners: false
+                        });
+
+                        fabricCanvas.add(img);
+                        fabricCanvas.setActiveObject(img);
+                        fabricCanvas.renderAll();
+                        showToast('Imagen cargada', 'fa-image');
+                    });
+                };
+                reader.readAsDataURL(file);
+            });
+
+            e.target.value = '';
+        }
+
+        document.getElementById('image-upload-desktop').addEventListener('change', handleImageUpload);
+        document.getElementById('image-upload-mobile').addEventListener('change', handleImageUpload);
+
+        document.getElementById('slider-layer-opacity').addEventListener('input', (e) => {
+            const obj = fabricCanvas.getActiveObject();
+            if (obj) {
+                const val = parseFloat(e.target.value);
+                obj.set('opacity', val);
+                document.getElementById('lbl-layer-opacity').textContent = `${Math.round(val * 100)}%`;
+                fabricCanvas.renderAll();
+                renderPSLayersList();
+            }
+        });
+
+        document.getElementById('btn-layer-top').addEventListener('click', () => {
+            const obj = fabricCanvas.getActiveObject();
+            if (obj) { obj.bringToFront(); fabricCanvas.renderAll(); renderPSLayersList(); }
+        });
+
+        document.getElementById('btn-layer-up').addEventListener('click', () => {
+            const obj = fabricCanvas.getActiveObject();
+            if (obj) { obj.bringForward(); fabricCanvas.renderAll(); renderPSLayersList(); }
+        });
+
+        document.getElementById('btn-layer-down').addEventListener('click', () => {
+            const obj = fabricCanvas.getActiveObject();
+            if (obj) { obj.sendBackwards(); fabricCanvas.renderAll(); renderPSLayersList(); }
+        });
+
+        document.getElementById('btn-layer-bottom').addEventListener('click', () => {
+            const obj = fabricCanvas.getActiveObject();
+            if (obj) { obj.sendToBack(); fabricCanvas.renderAll(); renderPSLayersList(); }
+        });
+
+        document.getElementById('btn-duplicate-layer').addEventListener('click', () => {
+            const obj = fabricCanvas.getActiveObject();
+            if (obj) {
+                obj.clone((cloned) => {
+                    cloned.set({ left: obj.left + 20, top: obj.top + 20 });
+                    fabricCanvas.add(cloned);
+                    fabricCanvas.setActiveObject(cloned);
+                    fabricCanvas.renderAll();
+                    showToast('Capa duplicada', 'fa-copy');
+                });
+            }
+        });
+
+        document.getElementById('btn-delete-layer').addEventListener('click', () => {
+            const obj = fabricCanvas.getActiveObject();
+            if (obj) {
+                fabricCanvas.remove(obj);
+                fabricCanvas.discardActiveObject();
+                fabricCanvas.renderAll();
+                showToast('Capa eliminada', 'fa-trash');
+            }
+        });
+
+        function applyFilter(index, filterObj) {
+            const obj = fabricCanvas.getActiveObject();
+            if (obj && obj.type === 'image') {
+                obj.filters[index] = filterObj;
+                obj.applyFilters();
+                fabricCanvas.renderAll();
+            }
+        }
+
+        document.getElementById('slider-brightness').addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            document.getElementById('lbl-brightness-val').textContent = val;
+            applyFilter(0, new fabric.Image.filters.Brightness({ brightness: val }));
+        });
+
+        document.getElementById('slider-contrast').addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            document.getElementById('lbl-contrast-val').textContent = val;
+            applyFilter(1, new fabric.Image.filters.Contrast({ contrast: val }));
+        });
+
+        document.getElementById('slider-saturation').addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            document.getElementById('lbl-saturation-val').textContent = val;
+            applyFilter(2, new fabric.Image.filters.Saturation({ saturation: val }));
+        });
+
+        const cropModal = document.getElementById('crop-modal');
+        const cropTargetImg = document.getElementById('crop-target-img');
+
+        function openCropper() {
+            const activeObj = fabricCanvas.getActiveObject();
+            if (!activeObj || activeObj.type !== 'image') {
+                showToast('Selecciona una foto para recortar', 'fa-hand-pointer');
+                return;
+            }
+
+            cropTargetImg.src = activeObj.getElement().src;
+            cropModal.classList.remove('hidden');
+
+            if (activeCropper) activeCropper.destroy();
+
+            activeCropper = new Cropper(cropTargetImg, {
+                aspectRatio: NaN,
+                viewMode: 1,
+                background: false,
+                autoCropArea: 0.95
+            });
+        }
+
+        document.getElementById('btn-quick-crop').addEventListener('click', openCropper);
+        document.getElementById('btn-crop-desktop').addEventListener('click', openCropper);
+        document.getElementById('btn-tab-crop').addEventListener('click', openCropper);
+
+        document.getElementById('btn-cancel-crop').addEventListener('click', () => {
+            cropModal.classList.add('hidden');
+            if (activeCropper) { activeCropper.destroy(); activeCropper = null; }
+        });
+
+        // Aspect ratio preset click handling
+        document.querySelectorAll('.btn-crop-ratio').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.btn-crop-ratio').forEach(b => {
+                    b.classList.remove('bg-sky-600', 'text-white');
+                    b.classList.add('bg-zinc-800', 'text-zinc-300');
+                });
+                btn.classList.remove('bg-zinc-800', 'text-zinc-300');
+                btn.classList.add('bg-sky-600', 'text-white');
+
+                const aspect = btn.getAttribute('data-aspect');
+                if (activeCropper) {
+                    activeCropper.setAspectRatio(aspect === 'free' ? NaN : parseFloat(aspect));
+                }
+            });
+        });
+
+        document.getElementById('btn-apply-crop').addEventListener('click', () => {
+            if (!activeCropper) return;
+
+            const croppedDataUrl = activeCropper.getCroppedCanvas().toDataURL();
+            const activeObj = fabricCanvas.getActiveObject();
+
+            if (activeObj && activeObj.type === 'image') {
+                fabric.Image.fromURL(croppedDataUrl, (newImg) => {
+                    newImg.set({
+                        left: activeObj.left,
+                        top: activeObj.top,
+                        scaleX: activeObj.scaleX,
+                        scaleY: activeObj.scaleY,
+                        angle: activeObj.angle,
+                        opacity: activeObj.opacity,
+                        cornerStyle: 'circle',
+                        cornerColor: '#0ea5e9',
+                        borderColor: '#38bdf8',
+                        cornerSize: 12,
+                        transparentCorners: false
+                    });
+
+                    fabricCanvas.remove(activeObj);
+                    fabricCanvas.add(newImg);
+                    fabricCanvas.setActiveObject(newImg);
+                    fabricCanvas.renderAll();
+                    
+                    cropModal.classList.add('hidden');
+                    activeCropper.destroy();
+                    activeCropper = null;
+                    showToast('Foto recortada con éxito', 'fa-crop-simple');
+                });
+            }
+        });
+
+        document.getElementById('btn-rotate-left').addEventListener('click', () => {
+            const obj = fabricCanvas.getActiveObject();
+            if (obj) { obj.rotate((obj.angle || 0) - 90); fabricCanvas.renderAll(); }
+        });
+
+        document.getElementById('btn-rotate-right').addEventListener('click', () => {
+            const obj = fabricCanvas.getActiveObject();
+            if (obj) { obj.rotate((obj.angle || 0) + 90); fabricCanvas.renderAll(); }
+        });
+
+        document.getElementById('btn-flip-x').addEventListener('click', () => {
+            const obj = fabricCanvas.getActiveObject();
+            if (obj) { obj.set('flipX', !obj.flipX); fabricCanvas.renderAll(); }
+        });
+
+        document.getElementById('btn-quick-delete').addEventListener('click', () => {
+            const obj = fabricCanvas.getActiveObject();
+            if (obj) {
+                fabricCanvas.remove(obj);
+                fabricCanvas.discardActiveObject();
+                fabricCanvas.renderAll();
+            }
+        });
+
+        document.getElementById('format-selector').addEventListener('change', (e) => {
+            currentFormatKey = e.target.value;
+            initCanvas();
+            showToast('Formato de lienzo cambiado');
+        });
+
+        document.getElementById('btn-clear-canvas').addEventListener('click', () => {
+            fabricCanvas.clear();
+            fabricCanvas.setBackgroundColor('#ffffff', fabricCanvas.renderAll.bind(fabricCanvas));
+            showToast('Lienzo vaciado', 'fa-trash-can');
+        });
+
+        // PS Layers Drawer Mobile/Desktop Toggle
+        const layersDrawer = document.getElementById('ps-layers-drawer');
+        const toggleDrawer = () => layersDrawer.classList.toggle('translate-x-full');
+
+        document.getElementById('btn-toggle-layers-desktop').addEventListener('click', toggleDrawer);
+        document.getElementById('btn-tab-layers').addEventListener('click', toggleDrawer);
+        document.getElementById('btn-close-layers-drawer').addEventListener('click', toggleDrawer);
+
+        // Adjustments Modal Toggle
+        const adjModal = document.getElementById('adjustments-modal');
+        const openAdj = () => {
+            if (!fabricCanvas.getActiveObject()) {
+                showToast('Selecciona una foto primero', 'fa-hand-pointer');
+                return;
+            }
+            adjModal.classList.remove('hidden');
+        };
+
+        document.getElementById('btn-adjust-desktop').addEventListener('click', openAdj);
+        document.getElementById('btn-tab-adjust').addEventListener('click', openAdj);
+        document.getElementById('btn-close-adjustments').addEventListener('click', () => adjModal.classList.add('hidden'));
+
+        // Export Modal Handlers
+        const exportModal = document.getElementById('export-modal');
+        document.getElementById('btn-open-export').addEventListener('click', () => exportModal.classList.remove('hidden'));
+        document.getElementById('btn-close-export').addEventListener('click', () => exportModal.classList.add('hidden'));
+
+        function generateExportImage(format = 'png') {
+            fabricCanvas.discardActiveObject();
+            fabricCanvas.renderAll();
+
+            const targetWidth = CANVAS_FORMATS[currentFormatKey].printDpiWidth;
+            const multiplier = targetWidth / fabricCanvas.width;
+
+            return fabricCanvas.toDataURL({
+                format: format,
+                quality: 0.95,
+                multiplier: multiplier
+            });
+        }
+
+        document.getElementById('btn-export-png').addEventListener('click', () => {
+            const dataUrl = generateExportImage('png');
+            const link = document.createElement('a');
+            link.download = `FotoCarlos_${currentFormatKey}_${Date.now()}.png`;
+            link.href = dataUrl;
+            link.click();
+            exportModal.classList.add('hidden');
+            showToast('Guardando PNG de alta calidad...', 'fa-file-arrow-down');
+        });
+
+        document.getElementById('btn-export-jpg').addEventListener('click', () => {
+            const dataUrl = generateExportImage('jpeg');
+            const link = document.createElement('a');
+            link.download = `FotoCarlos_${currentFormatKey}_${Date.now()}.jpg`;
+            link.href = dataUrl;
+            link.click();
+            exportModal.classList.add('hidden');
+            showToast('Guardando JPG...', 'fa-file-arrow-down');
+        });
+
+        document.getElementById('btn-print-direct').addEventListener('click', () => {
+            const dataUrl = generateExportImage('png');
+            const printImg = document.getElementById('print-image');
+            const printContainer = document.getElementById('print-container');
+            
+            printImg.src = dataUrl;
+            printContainer.classList.remove('hidden');
+            exportModal.classList.add('hidden');
+
+            setTimeout(() => {
+                window.print();
+                printContainer.classList.add('hidden');
+            }, 300);
+        });
+
+        window.addEventListener('load', initCanvas);
+        window.addEventListener('resize', () => fabricCanvas && initCanvas());
+    </script>
+</body>
+</html>
